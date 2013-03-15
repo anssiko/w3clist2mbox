@@ -1,0 +1,84 @@
+#!/opt/local/bin/perl -w
+
+=head1 NAME
+
+w3clist2mbox - Convert a W3C-style hypermail mail archive referenced by an URL
+to a Unix mbox file.
+
+=head1 SYNOPSIS
+
+  # Downloads a W3C-style hypermail archive referenced by 'url', and converts
+  # it to a Unix mbox file.
+  
+  w3clist2mbox url
+  
+=head1 DESCRIPTION
+
+This script automates the process of converting a W3C-style hypermail archive
+to a Unix mbox file, to be imported into your email client, for example. The
+conversion is handled by hm2mbox-w3c, which is a patched version of hm2mbox to
+support W3C-style archives.
+
+See hm2mbox <http://www.tifaware.com/perl/hm2mbox/> for required Perl modules.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2013, Anssi Kostiainen.
+All rights reserved.
+
+This script is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
+
+############################################################################
+
+use warnings;
+use strict;
+use Term::ANSIColor;
+
+if (@ARGV != 1) {
+  warn "\n",
+    "Convert a W3C-style hypermail mail archive referenced by 'url' ",
+    "to a Unix mbox file.\n",
+    "\n",
+    "Usage: $0 url\n",
+    "\n",
+    "url\tW3C mailing list archive URL by period, e.g.\n",
+    "\thttp://lists.w3.org/Archives/Public/public-foobar/2013Mar/\n\n";
+  exit(9);
+}
+  
+my ($url, $mbox) = @ARGV;
+my $base_path = "http://lists.w3.org/Archives/Public/";
+my $list_path;
+my $mbox_filename;
+
+# Extract the mailing list-specific path and period, e.g. public-foobar/2013Mar/
+$list_path = $url;
+$list_path =~ s/\Q$base_path//s;
+
+# Define the mbox filename, e.g. public-foobar2013Mar.mbox
+$mbox_filename = $list_path . ".mbox";
+$mbox_filename =~ s/\///gs;
+
+# Download the hypermail archive using wget.
+print colored ("\nDownloading the W3C hypermail archive from " . $url, 'white on_blue'), "\n\n";
+my $download = system("wget -P " . $list_path . " -r -l 1 -nd -nv -A [0-9][0-9][0-9][0-9].html" . 
+                      " -N -e robots=off " . $base_path . $list_path);
+if ($download != 0) {
+  die print colored ("\nAn error occurred downloading the archive.", 'white on_red'), "\n\n";
+}
+
+# Convert the archive to a Unix mbox file using a patched version of hm2mbox.
+print colored ("\nConverting the archive to mbox.", 'white on_blue'), "\n\n";
+my $conversion = system("./hm2mbox-w3c -d " . $list_path . " > " . $list_path . $mbox_filename);
+if ($conversion != 0) {
+  die print colored ("\nAn error occurred converting a message. Try to" .
+      " remove the problematic message above from the local" .
+      " working directory at " . $list_path .
+      " and run 'hm2mbox-w3c -d " . $list_path . " > filename.mbox'", 'white on_red'), "\n\n";
+}
+
+# Great success!
+print colored ("\nDone! The generated mbox file is at " . $list_path . $mbox_filename, 'black on_green'), "\n\n";
